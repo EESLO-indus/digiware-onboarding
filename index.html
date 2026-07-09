@@ -43,10 +43,12 @@
   .depart .row{display:grid;grid-template-columns:56px 1fr 1fr 120px;gap:10px;align-items:end}
   .depart .num{font-weight:700;color:var(--blue);text-align:center;padding-bottom:9px}
   @media(max-width:640px){.depart .row{grid-template-columns:1fr}}
-  .modechoice{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 14px}
-  .modechoice .opt{flex:1;min-width:220px;border:2px solid var(--line);border-radius:8px;padding:12px;cursor:pointer;background:#fff}
-  .modechoice .opt.sel{border-color:var(--blue);background:var(--light)}
-  .modechoice .opt b{color:var(--navy)}
+  .modele-card{background:#f2f7ff;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:0 8px 8px 0;padding:10px 14px;margin:2px 0 14px;font-size:13px;line-height:1.5}
+  .modele-card .mc-title{font-weight:700;color:var(--navy);font-size:14px;margin-bottom:4px}
+  .modele-card .mc-line{margin:3px 0}
+  .modele-card .mc-line b{color:var(--navy)}
+  .modele-card .mc-params{color:var(--muted);font-size:12px;margin-top:6px}
+  .modele-card .mc-note{color:#8a6d00;background:#fff8e6;border:1px solid #f0d488;border-radius:6px;padding:5px 9px;margin:6px 0;font-size:12px}
   .famille{border:1px solid var(--line);border-radius:8px;margin:10px 0;overflow:hidden}
   .famille>.fh{background:#eef2fa;padding:9px 12px;font-weight:600;color:var(--navy);display:flex;justify-content:space-between;align-items:center;cursor:pointer}
   .famille>.fh .fh-left{display:flex;align-items:center}
@@ -164,22 +166,12 @@
   <section class="card">
     <h2>3. Mesures souhaitées</h2>
     <div class="body">
-      <p class="hint">Choisissez comment définir les grandeurs à mesurer (s'applique à l'ensemble des départs) :</p>
-      <div class="modechoice">
-        <div class="opt" data-mode="modele" id="optModele"><b>Suivre un modèle</b><br><span class="hint">Un jeu de mesures pré-sélectionné selon l'usage courant.</span></div>
-        <div class="opt" data-mode="libre" id="optLibre"><b>Mode libre</b><br><span class="hint">Vous voyez toutes les mesures possibles et cochez les vôtres.</span></div>
-      </div>
-
-      <div id="zoneModele" style="display:none">
-        <div class="field"><label>Modèle</label>
-          <select id="modeleSel"><option value="">— Choisir un modèle —</option></select></div>
-        <div id="modeleDetail" class="note" style="display:none"></div>
-      </div>
-
-      <div id="zoneLibre" style="display:none">
-        <p class="hint">Cliquez sur les bulles «&nbsp;?&nbsp;» pour savoir ce que mesure chaque grandeur et à quoi elle sert.</p>
-        <div id="catalogue"></div>
-      </div>
+      <p class="hint">Choisissez un <strong>modèle d'analyse</strong> adapté à votre objectif : les grandeurs pertinentes se cochent automatiquement ci-dessous — vous voyez exactement ce qui est sélectionné et pouvez tout ajuster. Ou partez d'une sélection libre.</p>
+      <div class="field"><label>Modèle d'analyse</label>
+        <select id="modeleSel"><option value="">— Sélection libre (aucun preset) —</option></select></div>
+      <div id="modeleDetail" class="modele-card" style="display:none"></div>
+      <p class="hint">Cliquez sur les bulles «&nbsp;?&nbsp;» pour le détail de chaque grandeur. Les cases cochées par un modèle restent modifiables.</p>
+      <div id="catalogue"></div>
     </div>
   </section>
 
@@ -324,15 +316,140 @@ const CATALOGUE = [
   ]},
 ];
 
-const MODELES = {
-  "Suivi de charge (courants)":       ["I","Ideseq","P","moyenne","minmax","tendances"],
-  "Bilan énergétique":                ["Ea","Er","Es","P","Q","S","PF","moyenne","tendances"],
-  "Qualité &amp; harmoniques":        ["V","U","THDI","THDU","harmo","Vdeseq","Ideseq","dip","swell","waveform"],
-  "Diagnostic complet":               CATALOGUE.flatMap(f=>f.mesures.map(m=>m.id)),
-};
+/* ===== MODÈLES D'ANALYSE (presets) =====
+   Issus d'une recherche normative (EN 50160, IEC 61000-2-4/4-30, IEEE 519,
+   NEMA MG-1, NEC 220.87, tan φ Enedis…). Sélectionner un modèle coche
+   automatiquement ses grandeurs (avec sous-options) dans le catalogue.
+   Chaque param : {id, phases?:[], options?:{optId:[choix]}, ranks?:[]}. */
+const R_2_25 = []; for (let r=2; r<=25; r++) R_2_25.push(r);
+const R_ODD_3_25 = [3,5,7,9,11,13,15,17,19,21,23,25];
+
+const MODELES = [
+  {key:"charge", label:"Suivi de charge & capacité",
+   purpose:"Mesurer le taux de charge réel de chaque départ — courants, puissance appelée, pointes horodatées — pour connaître la réserve disponible et repérer surcharges et déséquilibres.",
+   benefit:"Dimensionner juste (extension, raccordement, remplacement) et éviter les déclenchements pour surcharge, sans surinvestir.",
+   params:[
+     {id:"I", phases:["I1","I2","I3","In","I système"]},
+     {id:"Ideseq", options:{comp:["Global"]}},
+     {id:"S", options:{detail:["Totale"]}},
+     {id:"Pdemand"},
+     {id:"P", options:{sens:["Import (+)"], detail:["Totale"]}},
+     {id:"moyenne"},{id:"minmax"},{id:"tendances"}]},
+  {key:"energie", label:"Bilan énergétique",
+   purpose:"Cartographier les consommations (kWh) par départ et leur profil dans le temps pour identifier les usages significatifs, les talons (nuits, week-ends) et les dérives.",
+   benefit:"Cibler les économies au plus fort gisement et objectiver un plan d'actions avec un retour chiffré.",
+   params:[
+     {id:"Ea", options:{sens:["Importée (Ea+)"], periode:["Totale","Partielle"]}},
+     {id:"P", options:{sens:["Import (+)"], detail:["Totale"]}},
+     {id:"Pdemand"},
+     {id:"PF", phases:["Total"]},
+     {id:"tendances"},{id:"moyenne"}]},
+  {key:"reactif", label:"Compensation réactive (tan φ)",
+   purpose:"Mesurer le profil de puissance réactive et le tan φ réel dans le temps pour dimensionner (ou requalifier) une batterie de condensateurs et détecter une surcompensation.",
+   benefit:"Supprimer les pénalités d'énergie réactive du distributeur et libérer de la capacité en kVA sur transformateur et câbles.",
+   params:[
+     {id:"Q", options:{nature:["Les deux"], detail:["Totale"]}},
+     {id:"Er", options:{nature:["Inductive"], periode:["Totale","Partielle"]}},
+     {id:"PF", phases:["Total","Phase 1","Phase 2","Phase 3"]},
+     {id:"P", options:{sens:["Import (+)"], detail:["Totale"]}},
+     {id:"S", options:{detail:["Totale"]}},
+     {id:"Pdemand"},{id:"moyenne"},{id:"tendances"},
+     {id:"THDI", phases:["Système"]},
+     {id:"THDU", phases:["Système"]},
+     {id:"harmo", options:{grandeur:["Courant"]}, ranks:[5,7,11,13]}]},
+  {key:"en50160", label:"Conformité tension EN 50160",
+   purpose:"Vérifier sur au moins une semaine que la tension d'alimentation respecte les caractéristiques normalisées : niveau, fréquence, déséquilibre, distorsion harmonique et événements (creux, surtensions, coupures).",
+   benefit:"Constituer un dossier opposable au distributeur (réclamation qualité de fourniture) ou qualifier l'alimentation avant d'installer des équipements sensibles.",
+   params:[
+     {id:"V", phases:["V1","V2","V3","Vn"]},
+     {id:"U", phases:["U12","U23","U31"]},
+     {id:"F"},
+     {id:"Vdeseq", options:{comp:["Global"]}},
+     {id:"THDU", phases:["V1","V2","V3"]},
+     {id:"harmo", options:{grandeur:["Tension"]}, ranks:R_2_25},
+     {id:"dip"},{id:"swell"},{id:"interruption"},
+     {id:"moyenne"},{id:"minmax"},{id:"tendances"}]},
+  {key:"harmoniques", label:"Harmoniques & déclassement (IEEE 519)",
+   purpose:"Quantifier la pollution harmonique émise par les charges (courant) et son impact sur le réseau (tension) : spectre par rang, TDD, courant de neutre et contrainte thermique du transformateur.",
+   benefit:"Fiabiliser l'installation (échauffements câbles/transfo, déclenchements, condensateurs) et dimensionner filtrage, neutre renforcé ou transformateur K.",
+   params:[
+     {id:"THDI", phases:["I1","I2","I3","In"]},
+     {id:"THDU", phases:["Système"]},
+     {id:"TDD", phases:["Système"]},
+     {id:"I", phases:["I1","I2","I3","In"]},
+     {id:"Pdemand"},
+     {id:"harmo", options:{grandeur:["Courant","Tension"]}, ranks:R_ODD_3_25},
+     {id:"fondamental"},
+     {id:"Kfactor", phases:["I1","I2","I3","In"]},
+     {id:"moyenne"},{id:"tendances"}]},
+  {key:"perturbations", label:"Diagnostic perturbations & déclenchements",
+   purpose:"Capturer et horodater les événements (creux, surtensions, coupures, appels de courant) avec forme d'onde pour trouver la cause d'arrêts machines ou de déclenchements inexpliqués.",
+   benefit:"Identifier l'origine (interne : démarrage moteur ; externe : défaut réseau) et fiabiliser la production en traitant la vraie cause.",
+   params:[
+     {id:"dip"},{id:"swell"},{id:"interruption"},{id:"inrush"},{id:"waveform"},
+     {id:"V", phases:["V1","V2","V3"]},
+     {id:"U", phases:["U12","U23","U31"]},
+     {id:"I", phases:["I1","I2","I3","In"]},
+     {id:"F"},
+     {id:"Icrete", phases:["I1","I2","I3"]},
+     {id:"minmax"},{id:"tendances"}]},
+  {key:"moteurs", label:"Suivi moteurs & machines",
+   purpose:"Surveiller un départ moteur : équilibre des phases (tension et courant), courant de démarrage, charge réelle et dérive du facteur de puissance à charge constante.",
+   benefit:"Prévenir la casse moteur (déséquilibre, démarrages trop fréquents), régler les protections et détecter une usure avant la panne.",
+   params:[
+     {id:"I", phases:["I1","I2","I3","I système"]},
+     {id:"Ideseq", options:{comp:["Global"]}},
+     {id:"Vdeseq", options:{comp:["Global"]}},
+     {id:"V", phases:["V1","V2","V3"]},
+     {id:"U", phases:["U12","U23","U31"]},
+     {id:"inrush"},
+     {id:"P", options:{sens:["Import (+)"], detail:["Totale"]}},
+     {id:"Q", options:{nature:["Inductive"], detail:["Totale"]}},
+     {id:"S", options:{detail:["Totale"]}},
+     {id:"PF", phases:["Total","Phase 1","Phase 2","Phase 3"]},
+     {id:"minmax"},{id:"moyenne"},{id:"tendances"},
+     {id:"Icrete", phases:["I1","I2","I3"]},
+     {id:"THDI", phases:["Système"]},
+     {id:"harmo", options:{grandeur:["Courant"]}, ranks:[5,7,11,13,17,19]}]},
+  {key:"souscomptage", label:"Sous-comptage & répartition des usages",
+   purpose:"Mesurer l'énergie consommée par entité (atelier, locataire, process) sur une période bornée pour répartir les coûts ou alimenter un suivi réglementaire.",
+   benefit:"Refacturer ou allouer équitablement les charges d'énergie et documenter les obligations (décret tertiaire / ISO 50001) — étude préalable, hors comptage certifié MID.",
+   params:[
+     {id:"Ea", options:{sens:["Les deux"], periode:["Totale","Partielle"]}},
+     {id:"P", options:{sens:["Les deux"], detail:["Totale"]}},
+     {id:"Pdemand"},{id:"tendances"},{id:"moyenne"}]},
+  {key:"complet", label:"Audit complet (exploratoire)",
+   purpose:"Campagne courte « tout activé » quand le symptôme est inconnu ou multiple : on capture énergie, charge, qualité et événements, puis on resserre l'analyse.",
+   benefit:"Ne rien rater lors d'un premier passage sur un site inconnu, puis choisir le preset ciblé pour la campagne longue.",
+   note:"Volume de données et temps d'analyse élevés — réservé aux campagnes exploratoires courtes (quelques jours).",
+   params:[
+     {id:"I", phases:["I1","I2","I3","In","I système"]},
+     {id:"Ideseq", options:{comp:["Global"]}},
+     {id:"Icrete", phases:["I1","I2","I3","In"]},
+     {id:"V", phases:["V1","V2","V3","Vn"]},
+     {id:"U", phases:["U12","U23","U31"]},
+     {id:"Vdeseq", options:{comp:["Global"]}},
+     {id:"F"},
+     {id:"P", options:{sens:["Les deux"], detail:["Totale","Par phase"]}},
+     {id:"Q", options:{nature:["Les deux"], detail:["Totale"]}},
+     {id:"S", options:{detail:["Totale"]}},
+     {id:"Pdemand"},
+     {id:"PF", phases:["Total","Phase 1","Phase 2","Phase 3"]},
+     {id:"Ea", options:{sens:["Les deux"], periode:["Totale","Partielle"]}},
+     {id:"Er", options:{nature:["Les deux"], periode:["Totale","Partielle"]}},
+     {id:"Es", options:{periode:["Totale","Partielle"]}},
+     {id:"THDI", phases:["Système"]},
+     {id:"THDU", phases:["Système"]},
+     {id:"TDD", phases:["Système"]},
+     {id:"Kfactor", phases:["I1","I2","I3","In"]},
+     {id:"harmo", options:{grandeur:["Courant","Tension"]}, ranks:[2,3,4,5,7,9,11,13,15,17,19,21,23,25]},
+     {id:"dip"},{id:"swell"},{id:"interruption"},{id:"inrush"},
+     {id:"moyenne"},{id:"minmax"},{id:"fondamental"},{id:"tendances"},{id:"waveform"}]},
+];
+function modeleByKey(k){ return MODELES.find(m=>m.key===k); }
 
 /* ===== ÉTAT ===== */
-const state = {mode:"", modele:"", mesures:{}, tableaux:[]}; // mesures[id] = {on, phases:[], options:{}, ranks:[]}
+const state = {modele:"", mesures:{}, tableaux:[]}; // mesures[id] = {on, phases:[], options:{}, ranks:[]}
 const $ = s => document.querySelector(s);
 const el = (tag,attrs={},...kids)=>{const e=document.createElement(tag);for(const k in attrs){if(k==="class")e.className=attrs[k];else if(k==="html")e.innerHTML=attrs[k];else e.setAttribute(k,attrs[k]);}kids.forEach(k=>e.append(k));return e;};
 
@@ -418,31 +535,39 @@ function renderTableau(t,i){
   return card;
 }
 
-/* ===== MODE MESURES ===== */
-document.querySelectorAll(".modechoice .opt").forEach(o=>{
-  o.onclick=()=>setMode(o.dataset.mode);
-});
-function setMode(m){
-  state.mode=m;
-  $("#optModele").classList.toggle("sel",m==="modele");
-  $("#optLibre").classList.toggle("sel",m==="libre");
-  $("#zoneModele").style.display = m==="modele"?"block":"none";
-  $("#zoneLibre").style.display  = m==="libre"?"block":"none";
-  if(m==="libre" && !$("#catalogue").hasChildNodes()) renderCatalogue();
-  save();
-}
-
-/* ----- Modèles ----- */
-Object.keys(MODELES).forEach(k=>$("#modeleSel").append(el("option",{value:k},k.replace("&amp;","&"))));
+/* ===== MODÈLES D'ANALYSE ===== */
+MODELES.forEach(m=>$("#modeleSel").append(el("option",{value:m.key},m.label.replace("&amp;","&"))));
 $("#modeleSel").onchange=()=>{
   state.modele=$("#modeleSel").value;
-  const ids=MODELES[state.modele]||[];
-  const noms=ids.map(id=>labelOf(id)).filter(Boolean);
-  const box=$("#modeleDetail");
-  if(ids.length){box.style.display="block";box.innerHTML="<b>Ce modèle inclut :</b> "+noms.join(" · ");}
-  else box.style.display="none";
-  save();
+  if(state.modele) applyModele(state.modele);   // coche les grandeurs du modèle (visible)
+  renderModeleDetail(state.modele);
+  save(); updateStatus();
 };
+/* Applique un modèle : repart d'une base propre puis coche ses grandeurs + sous-options */
+function applyModele(key){
+  const mdl=modeleByKey(key); if(!mdl) return;
+  state.mesures={};
+  mdl.params.forEach(p=>{
+    const st=ms(p.id); st.on=true;
+    if(p.phases) st.phases=p.phases.slice();
+    if(p.options){ for(const k in p.options) st.options[k]=p.options[k].slice(); }
+    if(p.ranks) st.ranks=p.ranks.slice();
+  });
+  renderCatalogue();   // reconstruit le catalogue -> les cases apparaissent cochées
+}
+/* Carte explicative : à quoi sert le modèle + ce qu'il améliore + grandeurs cochées */
+function renderModeleDetail(key){
+  const box=$("#modeleDetail"), mdl=modeleByKey(key);
+  if(!mdl){ box.style.display="none"; box.innerHTML=""; return; }
+  const noms=mdl.params.map(p=>labelOf(p.id)).filter(Boolean);
+  box.style.display="block";
+  box.innerHTML =
+    "<div class='mc-title'>"+mdl.label.replace("&amp;","&")+"</div>"+
+    "<div class='mc-line'><b>À quoi ça sert :</b> "+mdl.purpose+"</div>"+
+    "<div class='mc-line'><b>Ce que ça permet d'améliorer :</b> "+mdl.benefit+"</div>"+
+    (mdl.note ? "<div class='mc-note'>⚠ "+mdl.note+"</div>" : "")+
+    "<div class='mc-line mc-params'><b>Grandeurs cochées ("+noms.length+") :</b> "+noms.join(" · ")+"</div>";
+}
 function labelOf(id){for(const f of CATALOGUE)for(const m of f.mesures)if(m.id===id)return m.label.replace("&amp;","&");return "";}
 
 /* ----- Catalogue (mode libre) ----- */
@@ -544,24 +669,21 @@ function collect(){
   ["entreprise","site","nom","prenom","fonction","tel","email","adresse","tension","neutre","frequence","psouscrite","debut","fin","pas","normes","remarques"]
     .forEach(k=>infos[k]=($("#c_"+k)||{}).value||"");
   infos.objectifs=[...selObjectifs];
+  const mdl=modeleByKey(state.modele);
+  infos.modele=mdl?mdl.label.replace("&amp;","&"):"";
   const data={infos,
     tableaux:(state.tableaux||[]).map((t,i)=>({n:i+1,nom:t.nom||"",departs:(t.departs||[]).map((d,j)=>({n:(i+1)+"."+(j+1),nom:d.nom,charge:d.charge,calibre:d.calibre||""}))})),
-    mode:state.mode, mesures:[]};
-  if(state.mode==="modele"){
-    data.modele=state.modele;
-    data.mesures=(MODELES[state.modele]||[]).map(id=>({mesure:labelOf(id)}));
-  } else if(state.mode==="libre"){
-    CATALOGUE.forEach(f=>f.mesures.forEach(m=>{
-      const st=state.mesures[m.id];
-      if(st&&st.on){
-        const rec={mesure:m.label.replace("&amp;","&")};
-        if(st.phases.length)rec.phases=st.phases;
-        for(const k in st.options)if(st.options[k].length)rec[k]=st.options[k];
-        if(st.ranks.length)rec.rangs=st.ranks.slice().sort((a,b)=>a-b);
-        data.mesures.push(rec);
-      }
-    }));
-  }
+    modele:state.modele, mesures:[]};
+  CATALOGUE.forEach(f=>f.mesures.forEach(m=>{
+    const st=state.mesures[m.id];
+    if(st&&st.on){
+      const rec={mesure:m.label.replace("&amp;","&")};
+      if(st.phases.length)rec.phases=st.phases;
+      for(const k in st.options)if(st.options[k].length)rec[k]=st.options[k];
+      if(st.ranks.length)rec.rangs=st.ranks.slice().sort((a,b)=>a-b);
+      data.mesures.push(rec);
+    }
+  }));
   return data;
 }
 function recap(){
@@ -576,6 +698,7 @@ function recap(){
   t+="  Réseau : "+d.infos.tension+"   Neutre : "+d.infos.neutre+"   Fréquence : "+d.infos.frequence+"\n";
   t+="  Période : "+d.infos.debut+" → "+d.infos.fin+"   Pas : "+d.infos.pas+"\n";
   t+="  Objectifs : "+(d.infos.objectifs.join(", ")||"—")+"\n";
+  t+="  Modèle d'analyse : "+(d.infos.modele||"— (sélection libre)")+"\n";
   t+="  Normes : "+d.infos.normes+"\n";
   if(d.infos.remarques)t+="  Remarques : "+d.infos.remarques+"\n";
   t+="\nTABLEAUX & DÉPARTS ("+d.tableaux.length+" tableau(x), "+nbDep+" départ(s))\n";
@@ -583,7 +706,7 @@ function recap(){
     t+="  ■ Tableau "+tb.n+" : "+(tb.nom||"(sans nom)")+"\n";
     tb.departs.forEach(x=>t+="      #"+x.n+" "+(x.nom||"(sans nom)")+(x.charge?"  — "+x.charge:"")+(x.calibre?"  — calibre "+x.calibre+" A":"")+"\n");
   });
-  t+="\nMESURES ("+(d.mode==="modele"?("modèle : "+d.modele):"mode libre")+")\n";
+  t+="\nMESURES ("+(d.infos.modele?("modèle : "+d.infos.modele):"sélection libre")+")\n";
   if(!d.mesures.length)t+="  (aucune mesure sélectionnée)\n";
   d.mesures.forEach(m=>{
     let line="  • "+m.mesure;
@@ -623,14 +746,13 @@ $("#btnReset").onclick=()=>{if(confirm("Effacer toute la fiche ?")){localStorage
 /* ===== SAUVEGARDE LOCALE ===== */
 function save(){
   const d=collect();
-  localStorage.setItem("onboardingDigiware",JSON.stringify({d, raw:{mesures:state.mesures, tableaux:state.tableaux, mode:state.mode, modele:state.modele}}));
+  localStorage.setItem("onboardingDigiware",JSON.stringify({d, raw:{mesures:state.mesures, tableaux:state.tableaux, modele:state.modele}}));
   updateStatus();
 }
 function updateStatus(){
   const nbT=(state.tableaux||[]).length;
   const nbD=(state.tableaux||[]).reduce((s,t)=>s+((t.departs||[]).length),0);
-  const nbMes = state.mode==="modele" ? (MODELES[state.modele]||[]).length
-              : Object.values(state.mesures).filter(x=>x&&x.on).length;
+  const nbMes = Object.values(state.mesures).filter(x=>x&&x.on).length;
   $("#statusBar").textContent=nbT+" tableau(x) · "+nbD+" départ(s) · "+nbMes+" mesure(s) · enregistré localement";
 }
 function load(){
@@ -647,7 +769,7 @@ function load(){
         state.tableaux=[{nom:"",departs:r.departs}];   // migration ancien format (liste plate de départs)
       }
       if(state.tableaux.length){$("#nbTableaux").value=state.tableaux.length; renderTableaux();}
-      if(r.mode){setMode(r.mode); if(r.mode==="modele"){$("#modeleSel").value=state.modele; $("#modeleSel").onchange();}}
+      if(state.modele){$("#modeleSel").value=state.modele; renderModeleDetail(state.modele);}
     }
   }catch(e){console.warn("load",e);}
   updateStatus();
@@ -655,7 +777,9 @@ function load(){
 
 /* détecte les modifs des champs texte pour la sauvegarde */
 document.querySelectorAll("input,select,textarea").forEach(e=>e.addEventListener("change",save));
-load(); updateStatus();
+load();
+renderCatalogue();   // catalogue toujours visible ; reflète l'état restauré
+updateStatus();
 </script>
 </body>
 </html>

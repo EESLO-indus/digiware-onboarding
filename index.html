@@ -207,13 +207,12 @@ const OBJECTIFS = [
 const RANGS = []; for (let r=2; r<=51; r++) RANGS.push(r);
 
 /* Presets de rangs d'harmoniques par famille d'équipements (signatures typiques).
-   Sources : redresseur 6 pulses -> h = 6k±1 (H5 dominant 25-40 %) ; charges monophasées
+   Sources : redresseur -> h = 6k±1 (H5 dominant 25-40 %) ; charges monophasées
    électroniques -> triplen 3/9/15 (s'additionnent dans le neutre) ; 12 pulses -> 11/13/23/25 ;
    soudage & fours à arc -> spectre large, rangs pairs inclus. */
 const PRESETS_HARMO = [
-  {label:"Variateurs / redresseurs 6 pulses", ranks:[5,7,11,13,17,19,23,25]},
+  {label:"Variateurs / redresseurs", ranks:[5,7,11,13,17,19,23,25]},
   {label:"Informatique / LED / charges monophasées", ranks:[3,5,7,9,15,21]},
-  {label:"Gros redresseurs 12 pulses", ranks:[11,13,23,25]},
   {label:"Soudage / fours à arc", ranks:[2,3,4,5,6,7,9,11,13]},
 ];
 
@@ -288,7 +287,7 @@ const CATALOGUE = [
       aide:"Quantifie l'échauffement supplémentaire d'un transformateur alimentant des charges polluées, donc le déclassement à lui appliquer. Utile avant d'ajouter des charges ou de remplacer un transformateur."},
     {id:"harmo", label:"Harmoniques individuels par rang", ranks:true,
       options:[{id:"grandeur",label:"Sur",choices:["Courant","Tension"],multi:true}],
-      aide:"Le détail rang par rang identifie <b>quelle famille d'équipements pollue</b> — chaque type a sa signature : <b>variateurs et redresseurs 6 pulses</b> → rangs 5, 7, 11, 13 (le rang 5 domine, souvent 25-40 % du fondamental) ; <b>informatique, LED et charges monophasées</b> → rangs 3, 9, 15, qui s'additionnent dans le neutre (courant de neutre jusqu'à 120-130 % des phases) ; <b>redresseurs 12 pulses</b> → 11, 13, 23, 25 ; <b>soudage et fours à arc</b> → spectre large, y compris rangs pairs. Ce détail sert aussi à dimensionner un éventuel filtrage. En cas de doute : les rangs impairs de 3 à 25 couvrent l'essentiel des cas industriels."},
+      aide:"Le détail rang par rang identifie <b>quelle famille d'équipements pollue</b> — chaque type a sa signature : <b>variateurs et redresseurs</b> → rangs 5, 7, 11, 13 (le rang 5 domine, souvent 25-40 % du fondamental) ; <b>informatique, LED et charges monophasées</b> → rangs 3, 9, 15, qui s'additionnent dans le neutre (courant de neutre jusqu'à 120-130 % des phases) ; <b>redresseurs 12 pulses</b> → 11, 13, 23, 25 ; <b>soudage et fours à arc</b> → spectre large, y compris rangs pairs. Ce détail sert aussi à dimensionner un éventuel filtrage. En cas de doute : les rangs impairs de 3 à 25 couvrent l'essentiel des cas industriels."},
   ]},
   {famille:"Événements qualité (EN 50160)",
     aide:"Contrairement aux mesures « tendance » enregistrées à intervalle fixe, ces événements sont capturés à l'instant où ils se produisent. À cocher si vous constatez des arrêts, redémarrages ou comportements inexpliqués de vos équipements.",
